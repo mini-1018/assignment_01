@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { onlineManager } from '@tanstack/react-query';
+import { PRODUCT_KEYWORD_MAX_LENGTH } from '@/entities/product';
 import { productFixtures } from '@/test/fixtures/products';
 import {
   getLastProductsRequest,
@@ -33,7 +34,7 @@ const listRegion = () => screen.getByRole('region', { name: LIST_NAME });
 const card = (title: string) => screen.getByRole('article', { name: title });
 const cardTitles = () =>
   screen.queryAllByRole('article').map((article) => within(article).getByRole('heading', { level: 3 }).textContent);
-const titleRequests = () => getProductsRequests().filter((url) => url.searchParams.has('title'));
+const titleRequests = () => getProductsRequests().filter((url) => url.searchParams.has('keyword'));
 
 /**
  * 화면의 유일한 live 영역. 로딩·결과·빈 상태·오류·재시도·오프라인 문구를 모두 이 한 곳이 알린다.
@@ -152,14 +153,14 @@ describe('ProductCatalog', () => {
 
     await user.click(passTab);
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(9));
-    expect(getLastProductsRequest().searchParams.get('product_type')).toBe('eq.패스');
+    expect(getLastProductsRequest().searchParams.get('type')).toBe('패스');
     expect(passTab).toHaveAttribute('aria-pressed', 'true');
     expect(allTab).toHaveAttribute('aria-pressed', 'false');
     expect(liveStatus()).toHaveTextContent(/^패스 · 상품 9개$/);
 
     await user.click(singleTab);
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(3));
-    expect(getLastProductsRequest().searchParams.get('product_type')).toBe('eq.단품');
+    expect(getLastProductsRequest().searchParams.get('type')).toBe('단품');
     expect(cardTitles()).toEqual(['2026 Hidden Kice 시즌7', '2026 Hidden Kice 시즌6', '2026 Hidden Kice 시즌5']);
 
     await user.click(allTab);
@@ -192,7 +193,7 @@ describe('ProductCatalog', () => {
     await flushWithoutAdvancing();
     // 300ms 시점에 이미 요청이 나갔어야 한다(상한). 중간 입력 '국'으로는 요청하지 않는다.
     expect(titleRequests()).toHaveLength(1);
-    expect(getLastProductsRequest().searchParams.get('title')).toBe('ilike.%국어%');
+    expect(getLastProductsRequest().searchParams.get('keyword')).toBe('국어');
 
     // 경계 확인이 끝났으니 실제 타이머로 돌려 응답과 이후 동작을 본다.
     vi.useRealTimers();
@@ -223,10 +224,18 @@ describe('ProductCatalog', () => {
     expect(cardTitles()).toEqual(['2026 Hidden Kice 국어 패스']);
     const combined = getProductsRequests().filter(
       (url) =>
-        url.searchParams.get('product_type') === 'eq.패스' && url.searchParams.get('title') === 'ilike.%국어%',
+        url.searchParams.get('type') === '패스' && url.searchParams.get('keyword') === '국어',
     );
     expect(combined).toHaveLength(1);
     expect(getLastProductsRequest()).toBe(combined[0]);
+  });
+
+  it('검색창은 서버가 받는 검색어 최대 길이까지만 입력받는다', async () => {
+    await renderCatalog();
+    expect(screen.getByRole('searchbox', { name: '상품명 검색' })).toHaveAttribute(
+      'maxLength',
+      String(PRODUCT_KEYWORD_MAX_LENGTH),
+    );
   });
 
   it('결과가 없는 검색어에는 빈 상태 안내를 보여주고, 조건을 담은 문구로 live 영역에서 알린다', async () => {
@@ -242,7 +251,7 @@ describe('ProductCatalog', () => {
     // 빈 상태 안내는 시각 표시일 뿐 새 live 영역을 만들지 않는다. 알림은 늘 있는 live 영역 하나가 맡는다.
     expect(liveStatus()).toHaveTextContent(/^'없는상품' 검색 · 조건에 맞는 상품 없음$/);
     expect(screen.queryAllByRole('article')).toHaveLength(0);
-    expect(getLastProductsRequest().searchParams.get('title')).toBe('ilike.%없는상품%');
+    expect(getLastProductsRequest().searchParams.get('keyword')).toBe('없는상품');
   });
 
   it('빈 상태에서 조건만 바꿔 다시 빈 상태가 되어도 바뀐 조건으로 다시 알린다', async () => {
@@ -263,7 +272,7 @@ describe('ProductCatalog', () => {
     const { user } = renderWithQuery(<ProductCatalog />);
 
     expect(await screen.findByText('상품을 불러오지 못했습니다.')).toBeInTheDocument();
-    expect(screen.getByText('Could not connect to database (PGRST000)')).toBeInTheDocument();
+    expect(screen.getByText('상품 정보를 불러오지 못했습니다. (UPSTREAM_ERROR)')).toBeInTheDocument();
     expect(screen.queryAllByRole('article')).toHaveLength(0);
     expect(liveStatus()).toHaveTextContent(/^상품을 불러오지 못했습니다\. 다시 시도해 주세요\.$/);
 
@@ -380,11 +389,11 @@ describe('ProductCatalog', () => {
     expect(cardTitles()).toEqual(ALL_TITLES);
     // 멈춘 요청을 "갱신 중"으로 표시하지 않는다.
     expect(listRegion()).not.toHaveAttribute('aria-busy');
-    expect(getProductsRequests().filter((url) => url.searchParams.has('product_type'))).toHaveLength(0);
+    expect(getProductsRequests().filter((url) => url.searchParams.has('type'))).toHaveLength(0);
 
     act(() => onlineManager.setOnline(true));
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(9));
-    expect(getLastProductsRequest().searchParams.get('product_type')).toBe('eq.패스');
+    expect(getLastProductsRequest().searchParams.get('type')).toBe('패스');
     expect(screen.queryByText(/인터넷에 연결되어 있지 않아/)).not.toBeInTheDocument();
     expect(liveStatus()).toHaveTextContent(/^패스 · 상품 9개$/);
   });
@@ -402,13 +411,13 @@ describe('ProductCatalog', () => {
     // 갱신 중 표시가 남지 않는다.
     expect(document.querySelector('[aria-busy]')).toBeNull();
     expect(liveStatus()).toHaveTextContent(/^상품을 불러오지 못했습니다\. 다시 시도해 주세요\.$/);
-    expect(getLastProductsRequest().searchParams.get('product_type')).toBe('eq.패스');
+    expect(getLastProductsRequest().searchParams.get('type')).toBe('패스');
 
     // 다시 시도는 바뀐 조건(패스)으로 요청한다.
     server.resetHandlers();
     await user.click(screen.getByRole('button', { name: '다시 시도' }));
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(9));
-    expect(getLastProductsRequest().searchParams.get('product_type')).toBe('eq.패스');
+    expect(getLastProductsRequest().searchParams.get('type')).toBe('패스');
     expect(screen.queryByText('상품을 불러오지 못했습니다.')).not.toBeInTheDocument();
     expect(listRegion()).not.toHaveAttribute('aria-busy');
     expect(liveStatus()).toHaveTextContent(/^패스 · 상품 9개$/);
@@ -422,7 +431,7 @@ describe('ProductCatalog', () => {
     await user.click(screen.getByRole('button', { name: '패스' }));
 
     await waitFor(() => expect(listRegion()).toHaveAttribute('aria-busy', 'true'));
-    expect(getLastProductsRequest().searchParams.get('product_type')).toBe('eq.패스');
+    expect(getLastProductsRequest().searchParams.get('type')).toBe('패스');
     expect(cardTitles()).toEqual(ALL_TITLES);
     // 이전 결과가 보이는 동안에는 로딩 문구로 바꾸지 않고 이전 개수를 유지한다.
     expect(liveStatus()).toHaveTextContent(/^전체 · 상품 12개$/);
@@ -447,7 +456,7 @@ describe('ProductCatalog', () => {
     expect(within(listRegion()).getByText('조건에 맞는 상품이 없습니다')).toBeInTheDocument();
     // 이전 조건의 문구를 유지한다(새 결과가 오면 바뀐 문구만 읽힌다).
     expect(liveStatus()).toHaveTextContent(/^전체 · 조건에 맞는 상품 없음$/);
-    expect(getLastProductsRequest().searchParams.get('product_type')).toBe('eq.패스');
+    expect(getLastProductsRequest().searchParams.get('type')).toBe('패스');
 
     held.release();
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(9));

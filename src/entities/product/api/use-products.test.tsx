@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { waitFor } from '@testing-library/react';
-import { productFixtures } from '@/test/fixtures/products';
+import { http, HttpResponse } from 'msw';
+import { BFF_PRODUCTS_URL } from '@/test/constants';
+import { productFixtures, productItemFixtures } from '@/test/fixtures/products';
 import {
   getLastProductsRequest,
   getProductsRequests,
@@ -10,11 +12,14 @@ import {
 } from '@/test/msw/handlers';
 import { server } from '@/test/msw/server';
 import { renderHookWithQuery } from '@/test/render';
-import { isNetworkError } from '../lib/query';
+import { ApiError, isNetworkError, NetworkError } from '@/shared/api/http';
 import type { ProductQuery } from '../model/types';
 import { useProducts } from './use-products';
 
-const PUBLIC_BASE = 'https://test.supabase.co/storage/v1/object/public/images';
+/**
+ * 브라우저 층: 훅은 BFF `GET /api/products` 만 부른다. Supabase URL 형식은 여기서 단언하지 않는다
+ * (서버 층 src/app/api-routes/products.server.test.ts 와 get-products.server.test.ts 가 맡는다).
+ */
 
 async function renderProducts(query: ProductQuery) {
   const utils = renderHookWithQuery(() => useProducts(query));
@@ -23,154 +28,116 @@ async function renderProducts(query: ProductQuery) {
 }
 
 describe('useProducts', () => {
-  it('조건이 없으면 12개 전부를 sort_order 오름차순으로 돌려준다', async () => {
+  it('조건이 없으면 쿼리 문자열 없이 /api/products 를 부르고 { items } 를 Product[] 로 돌려준다', async () => {
     const { result } = await renderProducts({ keyword: '', type: null });
 
     expect(result.current.error).toBeNull();
-    expect(result.current.data).toHaveLength(12);
-    expect(result.current.data?.map((p) => p.sort_order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(result.current.data).toEqual(productItemFixtures);
 
     const url = getLastProductsRequest();
-    expect(url.searchParams.get('order')).toBe('sort_order.asc');
-    expect(url.searchParams.has('product_type')).toBe(false);
-    expect(url.searchParams.has('title')).toBe(false);
+    expect(url.pathname).toBe('/api/products');
+    expect(url.search).toBe('');
   });
 
-  it('화면이 쓰는 컬럼만 명시해 select 한다(* 를 쓰지 않는다)', async () => {
-    await renderProducts({ keyword: '', type: null });
-
-    const columns = getLastProductsRequest().searchParams.get('select')?.split(',');
-    expect(columns).toEqual([
-      'id',
-      'product_type',
-      'title',
-      'price',
-      'sale_price',
-      'discount_rate',
-      'image_url',
-      'sort_order',
-      'created_at',
-    ]);
-  });
-
-  it("유형 '패스'면 product_type=eq.패스 로 요청하고 패스 9개만 돌려준다", async () => {
+  it("유형 '패스'면 type=패스 만 보낸다(빈 keyword 는 보내지 않는다)", async () => {
     const { result } = await renderProducts({ keyword: '', type: '패스' });
 
-    expect(getLastProductsRequest().searchParams.get('product_type')).toBe('eq.패스');
+    const url = getLastProductsRequest();
+    expect(url.searchParams.get('type')).toBe('패스');
+    expect(url.searchParams.has('keyword')).toBe(false);
     expect(result.current.data).toHaveLength(9);
     expect(result.current.data?.every((p) => p.product_type === '패스')).toBe(true);
   });
 
-  it("검색어 '국어'는 %로 감싼 ilike 로 요청하고(원문 URL 에서는 %25) 1개를 돌려준다", async () => {
-    const { result } = await renderProducts({ keyword: '국어', type: null });
+  it('검색어는 trim 해 keyword 로 보낸다(null type 은 보내지 않는다)', async () => {
+    const { result } = await renderProducts({ keyword: '  국어  ', type: null });
 
     const url = getLastProductsRequest();
-    // supabase-js 는 like 와일드카드로 `*` 가 아니라 `%` 를 보내고, URLSearchParams 가 `%25` 로 인코딩한다.
-    expect(url.searchParams.get('title')).toBe('ilike.%국어%');
-    expect(url.search).toContain(`title=ilike.%25${encodeURIComponent('국어')}%25`);
+    expect(url.searchParams.get('keyword')).toBe('국어');
+    expect(url.searchParams.has('type')).toBe(false);
     expect(result.current.data?.map((p) => p.title)).toEqual(['2026 Hidden Kice 국어 패스']);
   });
 
-  it('검색어 앞뒤 공백은 잘라서 요청한다', async () => {
-    const { result } = await renderProducts({ keyword: '  국어  ', type: null });
-
-    expect(getLastProductsRequest().searchParams.get('title')).toBe('ilike.%국어%');
-    expect(result.current.data).toHaveLength(1);
-  });
-
-  it('공백만 있는 검색어는 title 필터 없이 전체를 요청한다', async () => {
+  it('공백만 있는 검색어는 keyword 를 보내지 않는다', async () => {
     const { result } = await renderProducts({ keyword: '   ', type: null });
 
-    expect(getLastProductsRequest().searchParams.has('title')).toBe(false);
+    expect(getLastProductsRequest().search).toBe('');
     expect(result.current.data).toHaveLength(12);
   });
 
-  it("검색어 '%'는 이스케이프해 요청하므로 전체와 일치하지 않고 0개가 된다", async () => {
-    const { result } = await renderProducts({ keyword: '%', type: null });
-
-    expect(getLastProductsRequest().searchParams.get('title')).toBe('ilike.%\\%%');
-    expect(result.current.data).toEqual([]);
-  });
-
-  it('유형과 검색어를 함께 주면 두 조건을 모두 요청한다', async () => {
+  it('유형과 검색어를 함께 보낸다', async () => {
     const { result } = await renderProducts({ keyword: '시즌7', type: '단품' });
 
     const url = getLastProductsRequest();
-    expect(url.searchParams.get('product_type')).toBe('eq.단품');
-    expect(url.searchParams.get('title')).toBe('ilike.%시즌7%');
+    expect(url.searchParams.get('type')).toBe('단품');
+    expect(url.searchParams.get('keyword')).toBe('시즌7');
     expect(result.current.data?.map((p) => p.title)).toEqual(['2026 Hidden Kice 시즌7']);
   });
 
-  it('image_url 은 객체 경로가 아니라 Storage 공개 URL 로 바뀌어 나온다', async () => {
-    const { result } = await renderProducts({ keyword: '', type: null });
+  it('특수 문자 검색어는 이스케이프하지 않고 그대로 보낸다(이스케이프는 서버 몫)', async () => {
+    await renderProducts({ keyword: '50%_\\*', type: null });
 
-    const first = result.current.data?.[0];
-    expect(productFixtures[0].image_url).toBe('products/hidden-kice-single.png');
-    expect(first?.image_url).toBe(`${PUBLIC_BASE}/products/hidden-kice-single.png`);
-    expect(result.current.data?.every((p) => p.image_url.startsWith(`${PUBLIC_BASE}/products/`))).toBe(true);
+    expect(getLastProductsRequest().searchParams.get('keyword')).toBe('50%_\\*');
   });
 
-  it('500 오류 응답이면 error 가 Error 인스턴스이고 message 에 code 가 들어간다', async () => {
-    server.use(productsErrorHandler(500));
+  it('BFF 가 준 image_url(공개 URL)을 그대로 돌려준다', async () => {
+    const { result } = await renderProducts({ keyword: '', type: null });
+
+    expect(result.current.data?.[0].image_url).toBe(productItemFixtures[0].image_url);
+    expect(result.current.data?.[0].image_url).not.toBe(productFixtures[0].image_url);
+  });
+
+  it('오류 응답이면 status·code 를 가진 ApiError 이고 message 는 "문구 (code)" 다', async () => {
+    server.use(productsErrorHandler(502));
     const { result } = await renderProducts({ keyword: '', type: null });
 
     expect(result.current.data).toBeUndefined();
-    expect(result.current.error).toBeInstanceOf(Error);
-    expect(result.current.error?.message).toBe('Could not connect to database (PGRST000)');
-    expect(result.current.error?.cause).toMatchObject({ code: 'PGRST000' });
+    const error = result.current.error;
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 502, code: 'UPSTREAM_ERROR' });
+    expect(error?.message).toBe('상품 정보를 불러오지 못했습니다. (UPSTREAM_ERROR)');
+    expect(isNetworkError(error)).toBe(false);
   });
 
-  it('PGRST 오류(400) 응답도 Error 로 감싸고 code 를 message 에 남긴다', async () => {
+  it('400 INVALID_QUERY 도 ApiError 로 받는다', async () => {
     server.use(
-      productsErrorHandler(400, {
-        code: 'PGRST100',
-        message: 'failed to parse filter',
-        details: null,
-        hint: null,
-      }),
+      productsErrorHandler(400, { error: { code: 'INVALID_QUERY', message: '검색어는 100자 이하로 입력해 주세요.' } }),
     );
     const { result } = await renderProducts({ keyword: '', type: null });
 
-    expect(result.current.error).toBeInstanceOf(Error);
-    expect(result.current.error?.message).toContain('PGRST100');
+    expect(result.current.error).toMatchObject({ status: 400, code: 'INVALID_QUERY' });
+    expect(result.current.error?.message).toBe('검색어는 100자 이하로 입력해 주세요. (INVALID_QUERY)');
   });
 
-  it.each([
-    // 디코딩된 값 기준. 각 특수 문자 앞에 백슬래시 하나가 붙는다(JS 문자열이라 '\\' 가 백슬래시 한 글자).
-    ['_', 'ilike.%\\_%'],
-    ['\\', 'ilike.%\\\\%'],
-    ['*', 'ilike.%\\*%'],
-  ])("검색어 '%s'는 이스케이프해 title=%s 로 요청하고 0개가 된다", async (keyword, expected) => {
-    const { result } = await renderProducts({ keyword, type: null });
+  it('503 UPSTREAM_UNAVAILABLE 은 ApiError 이며 연결 문제로 판별되지 않는다', async () => {
+    server.use(
+      productsErrorHandler(503, { error: { code: 'UPSTREAM_UNAVAILABLE', message: '상품 서버에 연결하지 못했습니다.' } }),
+    );
+    const { result } = await renderProducts({ keyword: '', type: null });
 
-    expect(getLastProductsRequest().searchParams.get('title')).toBe(expected);
-    expect(result.current.data).toEqual([]);
+    expect(getProductsRequests()).toHaveLength(1);
+    expect(result.current.error).toBeInstanceOf(ApiError);
+    expect(result.current.error).toMatchObject({ status: 503, code: 'UPSTREAM_UNAVAILABLE' });
+    expect(isNetworkError(result.current.error)).toBe(false);
   });
 
-  it('네트워크 자체가 실패하면(fetch reject) supabase-js 는 다시 시도하지 않고 요청 1번 만에 Error 가 된다', async () => {
+  it('2xx 인데 items 가 배열이 아니면 INVALID_RESPONSE ApiError 다', async () => {
+    server.use(http.get(BFF_PRODUCTS_URL, () => HttpResponse.json({ data: [] })));
+    const { result } = await renderProducts({ keyword: '', type: null });
+
+    expect(result.current.error).toBeInstanceOf(ApiError);
+    expect(result.current.error).toMatchObject({ status: 200, code: 'INVALID_RESPONSE' });
+  });
+
+  it('BFF 에 닿지 못하면(fetch reject) 요청 1번 만에 NetworkError 가 되고 isNetworkError 가 true 다', async () => {
     server.use(productsNetworkErrorHandler());
     const { result } = await renderProducts({ keyword: '', type: null });
 
-    // client.ts 의 db.retry: false 로 postgrest-js 자체 재시도(1s·2s·4s)를 껐다. 재시도는 앱 QueryClient 몫이고
-    // 테스트 QueryClient 는 retry 를 끄므로 요청은 정확히 1번이다. 가짜 타이머 없이 곧바로 끝난다.
     expect(getProductsRequests()).toHaveLength(1);
     expect(result.current.data).toBeUndefined();
-    const error = result.current.error;
-    expect(error).toBeInstanceOf(Error);
-    // code 가 빈 문자열이라 message 뒤에 "()" 가 붙지 않는다.
-    expect(error?.message).toBe('TypeError: Failed to fetch');
-    expect(error?.cause).toMatchObject({ code: '', message: 'TypeError: Failed to fetch' });
-    expect(isNetworkError(error)).toBe(true);
-  });
-
-  it('503 응답도 supabase-js 가 다시 시도하지 않고 요청 1번 만에 Error 가 되며, 연결 문제로 판별되지 않는다', async () => {
-    server.use(productsErrorHandler(503));
-    const { result } = await renderProducts({ keyword: '', type: null });
-
-    expect(getProductsRequests()).toHaveLength(1);
-    expect(result.current.error).toBeInstanceOf(Error);
-    expect(result.current.error?.message).toBe('Could not connect to database (PGRST000)');
-    expect(isNetworkError(result.current.error)).toBe(false);
+    expect(result.current.error).toBeInstanceOf(NetworkError);
+    expect(result.current.error?.message).toBe('서버에 연결하지 못했습니다.');
+    expect(isNetworkError(result.current.error)).toBe(true);
   });
 
   it('응답이 오기 전에는 pending 이고, 요청은 이미 보내져 있다(productsHeldHandler)', async () => {
@@ -179,7 +146,7 @@ describe('useProducts', () => {
     const { result } = renderHookWithQuery(() => useProducts({ keyword: '', type: '단품' }));
 
     await waitFor(() => expect(getProductsRequests()).toHaveLength(1));
-    expect(getLastProductsRequest().searchParams.get('product_type')).toBe('eq.단품');
+    expect(getLastProductsRequest().searchParams.get('type')).toBe('단품');
     expect(result.current.isPending).toBe(true);
     expect(result.current.data).toBeUndefined();
 

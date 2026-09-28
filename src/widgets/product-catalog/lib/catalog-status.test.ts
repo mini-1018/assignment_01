@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { describeConditions, resolveCatalogState, type CatalogQueryState } from './catalog-status';
 
-/** fetch 가 reject 됐을 때 useProducts 가 던지는 오류와 같은 모양(entities/product/lib/query.ts 의 toError 결과). */
-const networkError = new Error('TypeError: Failed to fetch', {
-  cause: { message: 'TypeError: Failed to fetch', code: '' },
-});
-const serverError = new Error('Could not connect to database (PGRST000)', {
-  cause: { message: 'Could not connect to database', code: 'PGRST000' },
-});
+import { ApiError, NetworkError } from '@/shared/api/http';
+
+/** fetch 가 reject 됐을 때 useProducts 가 던지는 오류 */
+const networkError = new NetworkError({ cause: new TypeError('Failed to fetch') });
+/** BFF 가 Supabase 오류를 502 로 바꿔 돌려준 오류 */
+const serverError = new ApiError({ status: 502, code: 'UPSTREAM_ERROR', message: '상품 정보를 불러오지 못했습니다.' });
 
 const settled: CatalogQueryState = {
   isPending: false,
@@ -77,7 +76,7 @@ describe('resolveCatalogState', () => {
       view: {
         kind: 'error',
         title: '상품을 불러오지 못했습니다.',
-        detail: 'Could not connect to database (PGRST000)',
+        detail: '상품 정보를 불러오지 못했습니다. (UPSTREAM_ERROR)',
         retrying: false,
       },
       live: '상품을 불러오지 못했습니다. 다시 시도해 주세요.',

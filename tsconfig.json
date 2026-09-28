@@ -32,8 +32,6 @@
     "**/*.mts"
   ],
   "exclude": [
-    "node_modules",
-    "src/entities/product/api/use-products.test.tsx",
-    "src/entities/product/lib/query.test.ts"
+    "node_modules"
   ]
 }
