@@ -1,26 +1,48 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
 @import "tailwindcss";
+@import "../src/app/styles/tokens.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/*
+ * 토큰을 Tailwind 유틸리티로 노출한다.
+ * inline 을 쓰면 값이 아니라 var() 참조가 그대로 출력돼 토큰 한 곳만 고치면 전체가 바뀐다.
+ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-primary: var(--hk-primary);
+  --color-secondary: var(--hk-secondary);
+  --color-error: var(--hk-error);
+  --color-white: var(--hk-white);
+  --color-black: var(--hk-black);
+  --color-gray-50: var(--hk-gray-50);
+  --color-gray-100: var(--hk-gray-100);
+  --color-gray-200: var(--hk-gray-200);
+  --color-gray-300: var(--hk-gray-300);
+  --color-gray-500: var(--hk-gray-500);
+  --color-gray-800: var(--hk-gray-800);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-surface-soft: var(--hk-surface-soft);
+  --color-surface-muted: var(--hk-surface-muted);
+  --color-surface-tint: var(--hk-surface-tint);
+  --color-surface-primary-soft: var(--hk-surface-primary-soft);
+  --color-surface-map: var(--hk-surface-map);
+  --color-border-faint: var(--hk-border-faint);
+
+  --font-sans: var(--hk-font-sans);
+
+  --text-lg: var(--hk-text-lg);
+  --text-lg--line-height: 1.6;
+  --text-md: var(--hk-text-md);
+  --text-md--line-height: 1.6;
+  --text-sm: var(--hk-text-sm);
+  --text-sm--line-height: 1.5;
+  --text-xs: var(--hk-text-xs);
+  --text-xs--line-height: 1.4;
+
+  --radius-sm: var(--hk-radius-sm);
+  --radius-full: var(--hk-radius-full);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--hk-white);
+  color: var(--hk-black);
+  font-family: var(--hk-font-sans);
 }

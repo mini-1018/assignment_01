@@ -1,0 +1,49 @@
+/*
+ * 디자인 토큰 — Figma 변수(get_variable_defs)에서 그대로 옮긴 값이다.
+ * 파일: Vez3Pm043ITF7xkEPKeW9e "신입사원 테스트 (복사)"
+ *
+ * 컴포넌트에서 색·글자 크기 값을 직접 쓰지 않고 여기 정의된 토큰만 참조한다.
+ * 시안이 바뀌면 이 파일만 고치면 전체에 반영된다.
+ * globals.css 의 @theme inline 이 이 변수들을 Tailwind 유틸리티로 노출한다.
+ */
+:root {
+  /* Color — Figma: Color/* */
+  --hk-primary: #7f77dd;          /* Color/primary/default */
+  --hk-secondary: #fa622f;        /* Color/Secondary/default — 할인율 강조 */
+  --hk-error: #ef4444;            /* Color/Support/Error */
+  --hk-white: #ffffff;            /* Color/default/White */
+  --hk-black: #000000;            /* 시안의 상품명·가격 텍스트 */
+
+  --hk-gray-50: #e9eaec;          /* Color/gray/50  — 카드 테두리 */
+  --hk-gray-100: #ced0d4;         /* Color/gray/100 — 입력 테두리 */
+  --hk-gray-200: #b2b6bd;         /* Color/gray/200 — 푸터 텍스트, 정가 취소선 */
+  --hk-gray-300: #979ca5;         /* Color/gray/300 — 비활성 라벨 */
+  --hk-gray-500: #636873;         /* Color/gray/500 */
+  --hk-gray-800: #1c1e21;         /* Color/gray/800 — 활성 라벨 */
+
+  /* Surface — Figma 변수에는 없고 시안 프레임에서 측정한 배경색이다.
+     디자이너가 변수로 승격하면 위의 Color 블록으로 옮긴다. */
+  --hk-surface-soft: #f9fafc;     /* 카드/섹션 연한 배경 */
+  --hk-surface-muted: #f2f5f8;    /* 이미지 자리 배경 */
+  --hk-surface-tint: #f8f9fd;     /* AI OMR 히어로 배경 */
+  --hk-surface-primary-soft: #e4e8fe; /* primary 계열 연한 배경 */
+  --hk-surface-map: #e2e6ec;      /* 지도 자리 배경 */
+  --hk-border-faint: #e5e5e5;     /* 배너 하단 경계 */
+
+  /* Typography — Figma: PC/Body/* (Pretendard) */
+  --hk-font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+
+  --hk-text-lg: 18px;             /* PC/Body/Large/Regular   600 / 1.6 */
+  --hk-text-md: 16px;             /* PC/Body/Default/Regular 600 / 1.6 */
+  --hk-text-sm: 14px;             /* PC/Body/Small/*         600|500 / 1.5 */
+  --hk-text-xs: 10px;             /* GNB 배지 */
+
+  /* Radius — 시안 측정값 */
+  --hk-radius-sm: 6px;            /* 카드, 입력창 */
+  --hk-radius-full: 999px;        /* 배지, 페이지 인디케이터 */
+
+  /* Layout — 시안 기준 1440 / 콘텐츠 1280 */
+  --hk-content-width: 1280px;
+  --hk-gnb-height: 100px;
+}

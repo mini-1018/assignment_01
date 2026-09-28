@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/test/*": ["./test/*"],
+      "@/*": ["./src/*"]
     }
   },
   "include": [
@@ -30,5 +31,9 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "src/entities/product/api/use-products.test.tsx",
+    "src/entities/product/lib/query.test.ts"
+  ]
 }

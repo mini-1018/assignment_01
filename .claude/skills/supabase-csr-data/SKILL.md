@@ -119,6 +119,8 @@ export function useProducts() {
 
 프로바이더는 `src/app/providers/`에 두고 `app/layout.tsx`에서 감싼다. `QueryClient`는 `useState`로 한 번만 만든다. 모듈 최상위에서 만들면 사용자 간 캐시가 섞일 수 있다.
 
+훅을 추가하거나 바꾸면 같은 폴더에 `*.test.tsx`를 쓴다. supabase 클라이언트를 모킹하지 말고 MSW로 요청 URL을 단언한다. 새 테이블을 추가하면 `test/msw/handlers.ts`의 핸들러와 `test/fixtures/`도 추가하고, 시드 SQL을 바꾸면 fixtures도 같이 바꾼다. 자세한 규칙은 `fsd-architecture` 스킬의 `references/testing.md`를 따른다.
+
 ## 6. 화면 연결 계약
 
 훅을 쓰는 컴포넌트는 세 상태를 모두 렌더링한다.

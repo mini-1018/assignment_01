@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# env 예시 파일은 커밋한다
+!.env.example
+
+# 하네스 에이전트 작업 기록(로컬 전용)
+/_workspace/

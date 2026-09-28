@@ -90,8 +90,25 @@ entities/product/
 node .claude/skills/fsd-architecture/scripts/check-layer-imports.mjs
 ```
 
-위반 목록을 `파일:줄`로 출력하고, 위반이 있으면 종료 코드 1을 반환한다. QA 단계와 배포 전에 반드시 실행한다.
+위반 목록을 `파일:줄`(구조 검사는 경로)로 출력하고, 위반이 있으면 종료 코드 1을 반환한다. QA 단계와 배포 전에 반드시 실행한다.
+
+| 구분 | 잡는 것 | 수준 |
+| --- | --- | --- |
+| import | 하향 의존 위반, 같은 레이어 교차, 공개 API 우회, 테스트 누수(`test/` import). 정적·side-effect·동적 `import()`·`require` 모두 | 위반 |
+| import | 라우트(`app/`)가 `views`·`src/app` 외 레이어를 직접 import. 단 API 라우트(`app/**/api/**/route.ts`)는 서버 공개 API(`index.server`)도 허용 | 경고 |
+| 경계 | 클라이언트 파일(`'use client'`)이 서버 전용 모듈(`index.server`, `*.server.ts`, `'server-only'`를 import하는 파일)이나 `'server-only'`를 import | 위반 |
+| 경계 | 클라이언트 공개 API(`index.ts`)가 서버 전용 모듈을 import·재수출 | 위반 |
+| 경계 | `'server-only'`를 import하는데 이름이 `*.server.ts`가 아님, 또는 `*.server.ts`(`index.server` 제외)인데 `'server-only'`가 없음 | 경고 |
+| 구조 | `src/` 바로 아래의 레이어 아닌 폴더·파일(`components/`, 오타 `widget/` 등. 비슷하면 "혹시 X?" 제안) | 위반 |
+| 구조 | `views/widgets/features/entities` 바로 아래의 파일이나 세그먼트 이름 폴더, `index.ts(x)` 없는 슬라이스 | 위반 |
+| 구조 | 슬라이스·`shared`의 1단계 폴더가 `ui, api, model, lib, config` 밖. `src/app`은 여기에 `providers, styles, api-routes` 추가 | 경고 |
+| 구조 | 세그먼트 밖 파일: 슬라이스 루트의 `index`·`index.server`·`*.test.*` 외 파일, `shared`·`src/app` 루트의 파일 | 경고 |
+
+서버 전용 코드(BFF)는 공개 API를 둘로 나눈다. `index.ts`는 클라이언트에서 import해도 안전한 것만, `index.server.ts`는 서버에서만 쓰는 것만 내보낸다(FSD 공식 Next.js 가이드의 "Server and client public APIs"). 서버 전용 파일은 `*.server.ts`로 짓고 맨 위에 `import 'server-only'`를 둔다. Route Handler 로직은 `src/app/api-routes/`에 두고 `app/api/**/route.ts`는 재수출만 한다. 자세한 규약은 `references/conventions.md` 7절.
+
+테스트 파일은 대상 소스와 같은 세그먼트 폴더에 둔다(`references/testing.md`). `__tests__/` 폴더는 세그먼트 경고를 받는다. 허용 세그먼트를 늘려야 하면 스크립트의 `SEGMENTS`/`APP_SEGMENTS`에 이유 주석과 함께 추가한다.
 
 ## 참고
 
 - 경로 별칭, tsconfig 설정, ESLint 연동, 네이밍 규칙: `references/conventions.md`
+- 테스트 배치, 단계별 기준, 공용 테스트 도구(MSW·render 도우미): `references/testing.md`
