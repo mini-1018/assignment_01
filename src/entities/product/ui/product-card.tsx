@@ -1,6 +1,6 @@
-import { useId } from 'react';
-import Image from 'next/image';
-import { formatPrice, hasDiscount, type Product } from '../model/types';
+import { useId } from "react";
+import Image from "next/image";
+import { formatPrice, hasDiscount, type Product } from "../model/types";
 
 /**
  * 시안의 상품 카드. 이미지 250x320, 하단에 유형/상품명/가격.
@@ -27,12 +27,14 @@ export function ProductCard({ product }: { product: Product }) {
             alt=""
             fill
             sizes="(max-width: 768px) 50vw, 250px"
-            className="object-cover"
+            className="object-contain"
           />
         </div>
 
         <div className="flex flex-col">
-          <p className="text-md font-semibold text-gray-300">{product.product_type}</p>
+          <p className="text-md font-semibold text-gray-300">
+            {product.product_type}
+          </p>
           <div className="flex flex-col gap-2">
             <h3 id={titleId} className="text-md font-semibold text-black">
               {product.title}
@@ -42,14 +44,20 @@ export function ProductCard({ product }: { product: Product }) {
               <div className="flex flex-col">
                 <p className="text-sm font-medium text-gray-200">
                   <span className="sr-only">정가 </span>
-                  <del className="line-through">{formatPrice(product.price)}</del>
+                  <del className="line-through">
+                    {formatPrice(product.price)}
+                  </del>
                 </p>
                 <p className="flex items-center gap-1.5 text-md font-semibold whitespace-nowrap">
                   {/* sr-only 는 absolute 라 flex 항목이 아니다. gap 과 배치에 영향을 주지 않는다. */}
                   <span className="sr-only">할인율 </span>
-                  <span className="text-secondary">{product.discount_rate}%</span>
+                  <span className="text-secondary">
+                    {product.discount_rate}%
+                  </span>
                   <span className="sr-only">할인가 </span>
-                  <ins className="text-black no-underline">{formatPrice(product.sale_price as number)}</ins>
+                  <ins className="text-black no-underline">
+                    {formatPrice(product.sale_price as number)}
+                  </ins>
                 </p>
               </div>
             ) : (
